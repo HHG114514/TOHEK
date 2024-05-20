@@ -3,15 +3,19 @@ using System;
 using System.Runtime.CompilerServices;
 using TOHE.Modules;
 using TOHE.Roles.Core;
+using UnityEngine;
+using static TOHE.RandomSpawn;
 
 namespace TOHE;
 
 public static class AntiBlackout
 {
+    public static SolutionAntiBlackScreen currentSolution;
+
     ///<summary>
     /// Check num alive Impostors & Crewmates & NeutralKillers
     ///</summary>
-    public static bool BlackOutIsActive => !Options.DisableAntiBlackoutProtects.GetBool() && CheckBlackOut();
+    public static bool BlackOutIsActive => currentSolution != SolutionAntiBlackScreen.AntiBlackout_DisableProtect && CheckBlackOut();
 
     ///<summary>
     /// Count alive players and check black out 
@@ -28,13 +32,18 @@ public static class AntiBlackout
             // if player is ejected, do not count him as alive
             if (lastExiled != null && pc.PlayerId == lastExiled.PlayerId) continue;
 
-            if (pc.GetCustomRole().IsImpostor()) Impostors.Add(pc.PlayerId); // Impostors
-            else if (Main.PlayerStates[pc.PlayerId].countTypes == CountTypes.Impostor) Impostors.Add(pc.PlayerId); // Madmates
+            // Impostors and Madmates
+            if (pc.Is(CountTypes.Impostor))
+                Impostors.Add(pc.PlayerId);
+            
+            // Crewmate
+            else if (pc.Is(CountTypes.Crew) 
+                || pc.Is(CountTypes.OutOfGame) 
+                || pc.Is(CountTypes.None))
+                Crewmates.Add(pc.PlayerId); // Crewmates
 
-            else if (pc.GetCustomRole().IsNK()) NeutralKillers.Add(pc.PlayerId); // Neutral Killers
-            else if (pc.Is(CustomRoles.Cultist)) NeutralKillers.Add(pc.PlayerId);
-
-            else Crewmates.Add(pc.PlayerId);
+            // Other CountTypes counts as neutral killers
+            else NeutralKillers.Add(pc.PlayerId);
         }
 
         var numAliveImpostors = Impostors.Count;
@@ -47,21 +56,17 @@ public static class AntiBlackout
 
         var BlackOutIsActive = false;
 
-        // Don't check if Neutral killers are not present in the game
-        if (numAliveNeutralKillers >= 1)
-        {
-            // if all Crewmates is dead
-            if (!BlackOutIsActive)
-                BlackOutIsActive = numAliveCrewmates <= 0;
+        // if all Crewmates is dead
+        if (!BlackOutIsActive)
+            BlackOutIsActive = numAliveCrewmates <= 0;
 
-            // if all Impostors is dead and neutral killers > or = num alive crewmates
-            if (!BlackOutIsActive)
-                BlackOutIsActive = numAliveImpostors <= 0 && (numAliveNeutralKillers >= numAliveCrewmates);
+        // if all Impostors is dead and neutral killers > or = num alive crewmates
+        if (!BlackOutIsActive)
+            BlackOutIsActive = numAliveImpostors <= 0 && (numAliveNeutralKillers >= numAliveCrewmates);
 
-            // if num alive Impostors > or = num alive Crewmates/Neutral killers
-            if (!BlackOutIsActive)
-                BlackOutIsActive = numAliveImpostors >= (numAliveNeutralKillers + numAliveCrewmates);
-        }
+        // if num alive Impostors > or = num alive Crewmates/Neutral killers
+        if (!BlackOutIsActive)
+            BlackOutIsActive = numAliveImpostors >= (numAliveNeutralKillers + numAliveCrewmates);
 
         Logger.Info($" {BlackOutIsActive}", "BlackOut Is Active");
         return BlackOutIsActive;
@@ -162,6 +167,77 @@ public static class AntiBlackout
             logger.Info("==/Temp Restore==");
         }
     }
+
+    public static void FullResetCamForPlayer(PlayerControl player)
+    {
+        if (player == null || !AmongUsClient.Instance.AmHost || player.AmOwner || player.IsModClient()) return;
+
+        var ghostPlayer = Main.AllPlayerControls.FirstOrDefault(pc => !pc.IsAlive() && pc.PlayerId != player.PlayerId);
+        if (ghostPlayer == null) return;
+
+        var playerPosition = player.GetCustomPosition();
+        var systemtypes = Utils.GetCriticalSabotageSystemType();
+
+        var sender = CustomRpcSender.Create("ResetPlayerCam");
+        {
+            // Start critical sabotage locally for the player (clean up black screen)
+            sender.AutoStartRpc(ShipStatus.Instance.NetId, (byte)RpcCalls.UpdateSystem, targetClientId: player.GetClientId());
+            {
+                sender.Write((byte)systemtypes);
+                sender.WriteNetObject(player);
+                sender.Write((byte)128);
+            }
+            sender.EndRpc();
+            // Teleport a ghost player locally for the player
+            sender.AutoStartRpc(ghostPlayer.NetTransform.NetId, (byte)RpcCalls.SnapTo, targetClientId: player.GetClientId());
+            {
+                NetHelpers.WriteVector2(new Vector2(100f, 100f), sender.stream);
+                sender.Write((ushort)(ghostPlayer.NetTransform.lastSequenceId + 8));
+            }
+            sender.EndRpc();
+            // Player kill ghost player locally for the player
+            sender.AutoStartRpc(player.NetId, (byte)RpcCalls.MurderPlayer, targetClientId: player.GetClientId());
+            {
+                sender.WriteNetObject(ghostPlayer);
+                sender.Write((int)MurderResultFlags.Succeeded);
+            }
+            sender.EndRpc();
+        }
+        sender.SendMessage();
+
+        // In case the dead body is in plain sight
+        Main.UnreportableBodies.Add(ghostPlayer.PlayerId);
+
+        // End critical sabotage locally for the player
+        _ = new LateTask(() =>
+        {
+            if (player == null) return;
+
+            player.RpcDesyncUpdateSystem(systemtypes, 16);
+
+            if (GameStates.AirshipIsActive)
+            {
+                player.RpcDesyncUpdateSystem(systemtypes, 17);
+            }
+        }, 0.2f, "Fix Desync Reactor for reset cam", shoudLog: false);
+
+        // Teleport player back
+        _ = new LateTask(() =>
+        {
+            if (player == null) return;
+
+            if (GameStates.AirshipIsActive)
+            {
+                new AirshipSpawnMap().FirstTeleport(player);
+            }
+            else
+            {
+                player.RpcTeleport(playerPosition);
+            }
+
+        }, 0.4f, "Teleport player back", shoudLog: false);
+    }
+
     public static void AntiBlackRpcVotingComplete(this MeetingHud __instance, MeetingHud.VoterState[] states, GameData.PlayerInfo exiled, bool tie)
     {
         if (AmongUsClient.Instance.AmClient)
@@ -212,12 +288,23 @@ public static class AntiBlackout
     {
         var timeNotify = 0f;
 
-        if (CheckForEndVotingPatch.TempExileMsg != null && BlackOutIsActive)
+        if (BlackOutIsActive)
         {
-            timeNotify = 4f;
-            foreach (var pc in Main.AllPlayerControls.Where(p => p != null && !(p.AmOwner || p.IsModClient())).ToArray())
+            if (currentSolution == SolutionAntiBlackScreen.AntiBlackout_SkipVoting && CheckForEndVotingPatch.TempExileMsg != null)
             {
-                pc.Notify(CheckForEndVotingPatch.TempExileMsg, time: timeNotify);
+                timeNotify = 4f;
+                foreach (var pc in Main.AllPlayerControls.Where(p => p != null && !(p.AmOwner || p.IsModClient())).ToArray())
+                {
+                    pc.Notify(CheckForEndVotingPatch.TempExileMsg, time: timeNotify);
+                }
+            }
+            else if (currentSolution == SolutionAntiBlackScreen.AntiBlackout_FullResetCamera)
+            {
+                timeNotify = 12f;
+                foreach (var pc in Main.AllPlayerControls.Where(p => p != null && !(p.AmOwner || p.IsModClient())).ToArray())
+                {
+                    pc.Notify(Translator.GetString("AntiBlackout_ClickMapButtonToShowAllButtons"), time: timeNotify);
+                }
             }
         }
 
@@ -244,8 +331,16 @@ public static class AntiBlackout
         IsCached = false;
         ShowExiledInfo = false;
         StoreExiledMessage = "";
+        currentSolution = (SolutionAntiBlackScreen)Options.SolutionAntiBlackScreen.GetValue();
     }
 
     public static bool ShowExiledInfo = false;
     public static string StoreExiledMessage = "";
+}
+
+public enum SolutionAntiBlackScreen
+{
+    AntiBlackout_SkipVoting,
+    AntiBlackout_FullResetCamera,
+    AntiBlackout_DisableProtect
 }

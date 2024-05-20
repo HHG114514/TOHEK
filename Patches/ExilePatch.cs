@@ -93,14 +93,6 @@ class ExileControllerWrapUpPatch
         {
             player.GetRoleClass()?.OnPlayerExiled(player, exiled);
 
-            // Check Anti BlackOut
-            if (player.GetCustomRole().IsImpostor() 
-                && !player.IsAlive() // if player is dead impostor
-                && AntiBlackout.BlackOutIsActive) // if Anti BlackOut is activated
-            {
-                player.ResetPlayerCam(1f);
-            }
-
             // Check for remove pet
             player.RpcRemovePet();
 
@@ -108,6 +100,20 @@ class ExileControllerWrapUpPatch
             player.ResetKillCooldown();
             player.RpcResetAbilityCooldown();
         }
+
+        _ = new LateTask(() =>
+        {
+            if (AntiBlackout.currentSolution == SolutionAntiBlackScreen.AntiBlackout_FullResetCamera
+                && AntiBlackout.BlackOutIsActive)
+            {
+                foreach (var player in Main.AllPlayerControls)
+                {
+                    if (Main.ResetCamPlayerList.Contains(player.PlayerId) && exiled != null && exiled.PlayerId == player.PlayerId) continue;
+
+                    AntiBlackout.FullResetCamForPlayer(player);
+                }
+            }
+        }, 0.6f, "AntiBlackout Full Reset Camera For Player");
 
         Main.MeetingIsStarted = false;
         Main.MeetingsPassed++;
@@ -133,7 +139,7 @@ class ExileControllerWrapUpPatch
                 };
                 if (map != null) Main.AllPlayerControls.Do(map.RandomTeleport);
 
-            }, 0.8f, "Random Spawn After Meeting");
+            }, 1.2f, "Random Spawn After Meeting");
         }
     }
 

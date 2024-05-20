@@ -99,10 +99,15 @@ public static class Options
         RoleOff,
         RoleRate,
     }
-    public static readonly string[] CheatResponsesName =
-    [
-        "Ban", "Kick", "NoticeMe","NoticeEveryone", "TempBan", "OnlyCancel"
-    ];
+    private enum CheatResponsesName
+    {
+        Ban,
+        Kick,
+        NoticeMe,
+        NoticeEveryone,
+        TempBan,
+        OnlyCancel
+    }
     public static readonly string[] ConfirmEjectionsMode =
     [
         "ConfirmEjections.None",
@@ -131,6 +136,9 @@ public static class Options
 
 
     // ------------ System Settings Tab ------------
+
+    public static OptionItem SolutionAntiBlackScreen;
+
     public static OptionItem GradientTagsOpt;
     public static OptionItem EnableKillerLeftCommand;
     public static OptionItem SeeEjectedRolesInMeeting;
@@ -214,7 +222,6 @@ public static class Options
 
     public static OptionItem NoGameEnd;
     public static OptionItem AllowConsole;
-    public static OptionItem DisableAntiBlackoutProtects;
 
     public static OptionItem RoleAssigningAlgorithm;
     public static OptionItem KPDCamouflageMode;
@@ -1055,6 +1062,11 @@ public static class Options
         #endregion
 
         #region System Settings
+
+        SolutionAntiBlackScreen = StringOptionItem.Create(60033, "AntiBlackout_SolutionAntiBlackScreen", EnumHelper.GetAllNames<SolutionAntiBlackScreen>(), 1, TabGroup.SystemSettings, false)
+            .SetHeader(true)
+            .SetColor(Color.red);
+
         GradientTagsOpt = BooleanOptionItem.Create(60031, "EnableGadientTags", false, TabGroup.SystemSettings, false)
             .SetHeader(true);
         EnableKillerLeftCommand = BooleanOptionItem.Create(60040, "EnableKillerLeftCommand", true, TabGroup.SystemSettings, false)
@@ -1147,7 +1159,7 @@ public static class Options
         RemovePetsAtDeadPlayers = BooleanOptionItem.Create(60294, "RemovePetsAtDeadPlayers", false, TabGroup.SystemSettings, false)
             .SetColor(Color.magenta);
 
-        CheatResponses = StringOptionItem.Create(60250, "CheatResponses", CheatResponsesName, 0, TabGroup.SystemSettings, false)
+        CheatResponses = StringOptionItem.Create(60250, "CheatResponses", EnumHelper.GetAllNames<CheatResponsesName>(), 0, TabGroup.SystemSettings, false)
             .SetHeader(true);
         DisableVoteBan = BooleanOptionItem.Create(60260, "DisableVoteBan", false, TabGroup.SystemSettings, true);
 
@@ -1182,9 +1194,6 @@ public static class Options
             .SetColor(Color.red)
             .SetHeader(true);
         AllowConsole = BooleanOptionItem.Create(60382, "AllowConsole", false, TabGroup.SystemSettings, false)
-            .SetColor(Color.red);
-        DisableAntiBlackoutProtects = BooleanOptionItem.Create(60384, "DisableAntiBlackoutProtects", false, TabGroup.SystemSettings, false)
-            .SetGameMode(CustomGameMode.Standard)
             .SetColor(Color.red);
 
         RoleAssigningAlgorithm = StringOptionItem.Create(60400, "RoleAssigningAlgorithm", roleAssigningAlgorithms, 4, TabGroup.SystemSettings, true)

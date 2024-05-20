@@ -85,7 +85,7 @@ static class ExtendedPlayerControl
             var callerMethod = caller.GetMethod();
             string callerMethodName = callerMethod.Name;
             string callerClassName = callerMethod.DeclaringType.FullName;
-            Logger.Warn(callerClassName + "." + callerMethodName + "tried to retrieve CustomRole, but the target was null", "GetCustomRole");
+            Logger.Warn($"{callerClassName}.{callerMethodName} tried to retrieve CustomRole, but the target was null", "GetCustomRole");
             return CustomRoles.Crewmate;
         }
         var GetValue = Main.PlayerStates.TryGetValue(player.PlayerId, out var State);
@@ -97,7 +97,11 @@ static class ExtendedPlayerControl
     {
         if (player == null)
         {
-            Logger.Warn("tried to get CustomSubRole, but the target was null", "GetCustomSubRole");
+            var caller = new System.Diagnostics.StackFrame(1, false);
+            var callerMethod = caller.GetMethod();
+            string callerMethodName = callerMethod.Name;
+            string callerClassName = callerMethod.DeclaringType.FullName;
+            Logger.Warn($"{callerClassName}.{callerMethodName} tried to get CustomSubRole, but the target was null", "GetCustomSubRole");
             return [CustomRoles.NotAssigned];
         }
         return Main.PlayerStates[player.PlayerId].SubRoles;
@@ -110,7 +114,7 @@ static class ExtendedPlayerControl
             var callerMethod = caller.GetMethod();
             string callerMethodName = callerMethod.Name;
             string callerClassName = callerMethod.DeclaringType.FullName;
-            Logger.Warn(callerClassName + "." + callerMethodName + "tried to get CountTypes, but the target was null", "GetCountTypes");
+            Logger.Warn($"{callerClassName}.{callerMethodName} tried to get CountTypes, but the target was null", "GetCountTypes");
             return CountTypes.None;
         }
 
@@ -921,6 +925,16 @@ static class ExtendedPlayerControl
         Logger.Info($" {vent.transform.position}", "RpcVentTeleportPosition");
         player.RpcTeleport(new Vector2(vent.transform.position.x, vent.transform.position.y + 0.3636f));
     }
+
+    public static void RpcTeleportDesync(this PlayerControl player, PlayerControl target, Vector2 position)
+    {
+        ushort newSid = (ushort)(target.NetTransform.lastSequenceId + 8);
+        MessageWriter messageWriter = AmongUsClient.Instance.StartRpcImmediately(target.NetId, (byte)RpcCalls.SnapTo, SendOption.None, player.GetClientId());
+        NetHelpers.WriteVector2(position, messageWriter);
+        messageWriter.Write(newSid);
+        AmongUsClient.Instance.FinishRpcImmediately(messageWriter);
+    }
+
     public static string GetRoleInfo(this PlayerControl player, bool InfoLong = false)
     {
         var role = player.GetCustomRole();

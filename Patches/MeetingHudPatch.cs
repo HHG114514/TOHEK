@@ -67,7 +67,7 @@ class CheckForEndVotingPatch
                     });
                     states = [.. statesList];
 
-                    if (AntiBlackout.BlackOutIsActive)
+                    if (AntiBlackout.currentSolution == SolutionAntiBlackScreen.AntiBlackout_SkipVoting && AntiBlackout.BlackOutIsActive)
                     {
                         ExileControllerWrapUpPatch.AntiBlackout_LastExiled = voteTarget.Data;
                         //__instance.RpcVotingComplete(states, null, true);
@@ -323,7 +323,7 @@ class CheckForEndVotingPatch
             exiledPlayer?.Object.SetRealKiller(null);
 
             //RPC
-            if (AntiBlackout.BlackOutIsActive)
+            if (AntiBlackout.currentSolution == SolutionAntiBlackScreen.AntiBlackout_SkipVoting && AntiBlackout.BlackOutIsActive)
             {
                 ExileControllerWrapUpPatch.AntiBlackout_LastExiled = exiledPlayer;
                 //__instance.RpcVotingComplete(states, null, true);
@@ -924,7 +924,7 @@ class MeetingHudStartPatch
         }
 
         // AntiBlackout Message
-        if (AntiBlackout.BlackOutIsActive)
+        if (AntiBlackout.currentSolution == SolutionAntiBlackScreen.AntiBlackout_SkipVoting && AntiBlackout.BlackOutIsActive)
         {
             _ = new LateTask(() =>
             {
