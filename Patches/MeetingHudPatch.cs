@@ -190,9 +190,9 @@ class CheckForEndVotingPatch
                 var player = Utils.GetPlayerById(ps.TargetPlayerId);
                 var playerRoleClass = player.GetRoleClass();
 
-                // Hide roles vote
+                //Hides vote
                 if (playerRoleClass.HideVote(ps)) continue;
-                
+
                 // Assing Madmate Slef Vote
                 if (ps.TargetPlayerId == ps.VotedFor && Madmate.MadmateSpawnMode.GetInt() == 2) continue;
 
@@ -623,6 +623,21 @@ class CastVotePatch
                 return false;
             }
 
+
+            if (!voter.GetRoleClass().CheckVote(voter, target))
+            {
+                Logger.Info($"Canceling {voter.GetRealName()}'s vote because of {voter.GetCustomRole()}", "CastVotePatch..RoleBase.CheckVote");
+                __instance.RpcClearVote(voter.GetClientId());
+                    if (target != null)
+                    {
+                    // Attempts to set thumbsdown color to the same as playerrole to signify player ability used on (only for modded client)
+                        PlayerVoteArea pva = MeetingHud.Instance.playerStates.FirstOrDefault(pva => pva.TargetPlayerId == target.PlayerId);
+                        Color color = Utils.GetRoleColor(voter.GetCustomRole()).ShadeColor(0.5f);
+                        pva.ThumbsDown.set_color_Injected(ref color);
+                    }
+                return false;
+            }
+
             switch (voter.GetCustomRole())
             {
                 case CustomRoles.Dictator:
@@ -638,13 +653,6 @@ class CastVotePatch
                         __instance.RpcClearVote(voter.GetClientId());
                         return false;
                     } //patch here so checkend is not triggered
-                    break;
-                case CustomRoles.Keeper:
-                    if (!Keeper.OnVotes(voter, target))
-                    {
-                        __instance.RpcClearVote(voter.GetClientId());
-                        return false;
-                    }
                     break;
             }
         }
