@@ -1469,6 +1469,8 @@
   "LawyerVision": "<color=#008080>Lawyer</color> Vision",
   "FlashSpeed": "<color=#ff8400>Flash</color> Speed",
   "LoverSuicide": "<color=#ff9ace>Lovers</color> die together",
+  "LoversStealWinWhenAlive": "<color=#ff9ace>Lovers</color> steal the win when alive",
+  "LoversFollowWin": "<color=#ff9ace>Lovers</color> follow the winner team when died",
   "NumberOfLovers": "Number of <color=#ff9ace>Lover Pairs</color> (x2 members)",
   "LoverKnowRoles": "<color=#ff9ace>Lovers</color> know the roles of each other",
   "TrapperBlockMoveTime": "Freeze time",
