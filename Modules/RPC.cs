@@ -50,6 +50,7 @@ enum CustomRPC : byte // 194/255 USED
     SyncLobbyTimer,
     SyncPlayerSetting,
     ShowChat,
+    SyncShieldPersonDiedFirst,
 
     //Roles 
     SetBountyTarget,
@@ -628,6 +629,10 @@ internal class RPCHandlerPatch
                 break;
             case CustomRPC.SetSwapperVotes:
                 Swapper.ReceiveSwapRPC(reader, __instance);
+                break;
+            case CustomRPC.SyncShieldPersonDiedFirst:
+                Main.FirstDied = reader.ReadString();
+                Main.FirstDiedPrevious = reader.ReadString();
                 break;
         }
     }
